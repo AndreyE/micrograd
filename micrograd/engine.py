@@ -64,7 +64,6 @@ class Value:
         return out
 
     def backward(self):
-
         # topological order all of the children in the graph
         topo = []
         visited = set()
@@ -90,9 +89,6 @@ class Value:
             self.learning_rate *= dec  # decrease learning rate
         else:
             self.learning_rate *= inc  # otherwise increase it slightly
-
-        if abs(self.grad * self.learning_rate) < 1e-6:
-            self.learning_rate = 0.0
 
         self.data -= self.learning_rate * self.grad
 

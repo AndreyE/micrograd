@@ -7,6 +7,12 @@ class Module:
         for p in self.parameters():
             p.zero_grad()
 
+    def freeze(self):
+        for layer in self.layers:
+            if not layer.freeze():
+                return False
+        return True
+
     def parameters(self):
         return []
 
@@ -16,6 +22,7 @@ class Neuron(Module):
         self.w = [Value(random.uniform(-1,1)) for _ in range(nin)]
         self.b = Value(0)
         self.act = act
+        self.frozen = False
 
     def __call__(self, x):
         act = sum((wi*xi for wi,xi in zip(self.w, x)), self.b)
@@ -30,6 +37,14 @@ class Neuron(Module):
     def parameters(self):
         return self.w + [self.b]
 
+    def freeze(self):
+        if not self.frozen:
+            for v in self.parameters():
+                if v.learning_rate * abs(v.grad) < 1e-6:
+                    v.learning_rate = 0.0
+            self.frozen = all([v.learning_rate == 0.0 for v in self.parameters()])
+        return self.frozen
+
     def __repr__(self):
         return f"{self.act}-Neuron({len(self.w)})"
 
@@ -37,6 +52,7 @@ class Layer(Module):
 
     def __init__(self, nin, nout, **kwargs):
         self.neurons = [Neuron(nin, **kwargs) for _ in range(nout)]
+        self.frozen = False
 
     def __call__(self, x):
         out = [n(x) for n in self.neurons]
@@ -44,6 +60,13 @@ class Layer(Module):
 
     def parameters(self):
         return [p for n in self.neurons for p in n.parameters()]
+
+    def freeze(self):
+        if not self.frozen:
+            for n in self.neurons:
+                n.freeze()
+            self.frozen = all([n.frozen for n in self.neurons])
+        return self.frozen
 
     def __repr__(self):
         return f"Layer of [{', '.join(str(n) for n in self.neurons)}]"
