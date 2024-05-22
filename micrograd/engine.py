@@ -84,11 +84,13 @@ class Value:
         self.pgrad = self.grad
         self.grad = 0.0
 
-    def learn(self, dec=0.5, inc=1.1):
+    def learn(self, q=0.5):
+        assert q <= 1.0
+
         if self.pgrad * self.grad < 0: # if previous gradient had different sign
-            self.learning_rate *= dec  # decrease learning rate
+            self.learning_rate *= q  # decrease learning rate
         else:
-            self.learning_rate *= inc  # otherwise increase it slightly
+            self.learning_rate *= (1/q)**0.25  # otherwise increase it slightly
 
         self.data -= self.learning_rate * self.grad
 
