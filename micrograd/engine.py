@@ -91,6 +91,9 @@ class Value:
         else:
             self.learning_rate *= inc  # otherwise increase it slightly
 
+        if abs(self.grad * self.learning_rate) < 1e-6:
+            self.learning_rate = 0.0
+
         self.data -= self.learning_rate * self.grad
 
     def __neg__(self): # -self
