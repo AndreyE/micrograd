@@ -5,11 +5,13 @@ class Value:
 
     def __init__(self, data, _children=(), _op=''):
         self.data = data
-        self.grad = 0
+        self.grad = 0.0
+        self.pgrad = 0.0
         # internal variables used for autograd graph construction
         self._backward = lambda: None
         self._prev = set(_children)
         self._op = _op # the op that produced this node, for graphviz / debugging / etc
+        self.learning_rate = 1.0
 
     def __add__(self, other):
         other = other if isinstance(other, Value) else Value(other)
@@ -79,6 +81,18 @@ class Value:
         for v in reversed(topo):
             v._backward()
 
+    def zero_grad(self):
+        self.pgrad = self.grad
+        self.grad = 0.0
+
+    def learn(self, dec=0.5, inc=1.1):
+        if self.pgrad * self.grad < 0: # if previous gradient had different sign
+            self.learning_rate *= dec  # decrease learning rate
+        else:
+            self.learning_rate *= inc  # otherwise increase it slightly
+
+        self.data -= self.learning_rate * self.grad
+
     def __neg__(self): # -self
         return self * -1
 
@@ -101,4 +115,4 @@ class Value:
         return other * self**-1
 
     def __repr__(self):
-        return f"Value(data={self.data}, grad={self.grad})"
+        return f"Value(data={self.data}, grad={self.grad}, lr={self.learning_rate})"

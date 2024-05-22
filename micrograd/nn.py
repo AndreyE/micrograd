@@ -5,7 +5,7 @@ class Module:
 
     def zero_grad(self):
         for p in self.parameters():
-            p.grad = 0
+            p.zero_grad()
 
     def parameters(self):
         return []
