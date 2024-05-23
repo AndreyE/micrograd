@@ -11,7 +11,7 @@ class Value:
         self._backward = lambda: None
         self._prev = set(_children)
         self._op = _op # the op that produced this node, for graphviz / debugging / etc
-        self.learning_rate = 1.0
+        self.lr = 1.0
 
     def __add__(self, other):
         other = other if isinstance(other, Value) else Value(other)
@@ -63,7 +63,7 @@ class Value:
 
         return out
 
-    def backward(self):
+    def topo(self):
         # topological order all of the children in the graph
         topo = []
         visited = set()
@@ -75,9 +75,12 @@ class Value:
                 topo.append(v)
         build_topo(self)
 
+        return topo
+
+    def backward(self):
         # go one variable at a time and apply the chain rule to get its gradient
         self.grad = 1
-        for v in reversed(topo):
+        for v in reversed(self.topo()):
             v._backward()
 
     def zero_grad(self):
@@ -91,14 +94,14 @@ class Value:
             return
 
         # keep the step size stable
-        if self.pgrad > 0.0:
-            self.learning_rate = abs(self.learning_rate * self.pgrad / self.grad)
+        if abs(self.pgrad) > 0.0:
+            self.lr = abs(self.lr * self.pgrad / self.grad)
 
         # if previous gradient has different sign then reduce the step size by q
         if self.pgrad * self.grad < 0:
-            self.learning_rate *= q
+            self.lr *= q
 
-        self.data -= self.learning_rate * self.grad
+        self.data -= self.lr * self.grad
 
     def __neg__(self): # -self
         return self * -1
@@ -122,4 +125,4 @@ class Value:
         return other * self**-1
 
     def __repr__(self):
-        return f"Value(data={self.data}, grad={self.grad}, lr={self.learning_rate})"
+        return f"Value(data={self.data}, pgrad={self.pgrad}, grad={self.grad}, lr={self.lr})"
