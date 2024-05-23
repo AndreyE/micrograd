@@ -40,7 +40,7 @@ class Neuron(Module):
     def freeze(self):
         if not self.frozen:
             for v in self.parameters():
-                if v.learning_rate * abs(v.grad) < 1e-6:
+                if v.learning_rate * abs(v.grad) < 1e-4:
                     v.learning_rate = 0.0
             self.frozen = all([v.learning_rate == 0.0 for v in self.parameters()])
         return self.frozen
