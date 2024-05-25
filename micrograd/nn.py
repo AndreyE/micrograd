@@ -13,11 +13,6 @@ class Module:
                 return False
         return True
 
-    def init_lr(self):
-        for p in self.parameters():
-            assert p.grad != 0.0
-            p.lr = abs(1.0 / p.grad)
-
     def parameters(self):
         return []
 
@@ -35,8 +30,6 @@ class Neuron(Module):
             return act.relu()
         elif self.act == 'tanh':
             return act.tanh()
-        elif self.act == 'squeeze':
-            return act.squeeze()
 
         assert self.act == 'linear'
         return act

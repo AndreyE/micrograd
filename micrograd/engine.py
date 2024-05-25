@@ -4,14 +4,11 @@ class Value:
     """ stores a single scalar value and its gradient """
 
     def __init__(self, data, _children=(), _op=''):
-        # assert -1 <= data <= 1
         self.data = data
         self.grad = 0.0
         self.pgrad = 0.0
-        self.min = min(-1, -abs(data))
-        self.space = self.min * -2
         # internal variables used for autograd graph construction
-        self._backward = lambda: 1
+        self._backward = lambda: None
         self._prev = set(_children)
         self._op = _op # the op that produced this node, for graphviz / debugging / etc
         self.lr = 1.0
@@ -66,11 +63,6 @@ class Value:
 
         return out
 
-    def squeeze(self):
-        out = ((self - self.min) / self.space) * 2 - 1
-        out._op = 'squeeze'
-        return out
-
     def topo(self):
         # topological order all of the children in the graph
         topo = []
@@ -108,12 +100,8 @@ class Value:
         # if previous gradient has different sign then reduce the step size by q
         if self.pgrad * self.grad < 0:
             self.lr *= q
-        else:
-            self.lr *= q ** -(1/2)
 
         self.data -= self.lr * self.grad
-        self.min = min(self.data, self.min)
-        self.space = max(self.data - self.min, self.space)
 
     def __neg__(self): # -self
         return self * -1
@@ -137,4 +125,4 @@ class Value:
         return other * self**-1
 
     def __repr__(self):
-        return f"Value(data={self.data}, min={self.min}, space={self.space}, pgrad={self.pgrad}, grad={self.grad}, lr={self.lr})"
+        return f"Value(data={self.data}, pgrad={self.pgrad}, grad={self.grad}, lr={self.lr})"
