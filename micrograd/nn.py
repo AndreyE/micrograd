@@ -73,9 +73,15 @@ class Layer(Module):
 
 class MLP(Module):
 
-    def __init__(self, nin, nouts, act='tanh'):
+    def __init__(self, nin, nouts):
         sz = [nin] + nouts
-        self.layers = [Layer(sz[i], sz[i+1], act=act if i!=len(nouts)-1 else 'linear') for i in range(len(nouts))]
+        self.layers = [
+            Layer(
+                sz[i],
+                sz[i+1][0], # layer dimension
+                act=sz[i+1][1] # activation function
+            )
+            for i in range(len(nouts))]
 
     def __call__(self, x):
         for layer in self.layers:
