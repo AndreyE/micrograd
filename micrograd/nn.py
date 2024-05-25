@@ -7,20 +7,14 @@ class Module:
         for p in self.parameters():
             p.zero_grad()
 
-    def freeze(self):
-        for layer in self.layers:
-            if not layer.freeze():
-                return False
-        return True
-
     def parameters(self):
         return []
 
 class Neuron(Module):
 
-    def __init__(self, nin, act='linear'):
-        self.w = [Value(random.uniform(-1,1)) for _ in range(nin)]
-        self.b = Value(0)
+    def __init__(self, nin, act, **kwargs):
+        self.w = [Value(random.uniform(-1,1), **kwargs) for _ in range(nin)]
+        self.b = Value(0, **kwargs)
         self.act = act
         self.frozen = False
 
@@ -36,14 +30,6 @@ class Neuron(Module):
 
     def parameters(self):
         return self.w + [self.b]
-
-    def freeze(self):
-        if not self.frozen:
-            for v in self.parameters():
-                if v.learning_rate * abs(v.grad) < 1e-4:
-                    v.learning_rate = 0.0
-            self.frozen = all([v.learning_rate == 0.0 for v in self.parameters()])
-        return self.frozen
 
     def __repr__(self):
         return f"{self.act}-Neuron({len(self.w)})"
@@ -61,25 +47,19 @@ class Layer(Module):
     def parameters(self):
         return [p for n in self.neurons for p in n.parameters()]
 
-    def freeze(self):
-        if not self.frozen:
-            for n in self.neurons:
-                n.freeze()
-            self.frozen = all([n.frozen for n in self.neurons])
-        return self.frozen
-
     def __repr__(self):
         return f"Layer of [{', '.join(str(n) for n in self.neurons)}]"
 
 class MLP(Module):
 
-    def __init__(self, nin, nouts):
+    def __init__(self, nin, nouts, **kwargs):
         sz = [(nin, None)] + nouts
         self.layers = [
             Layer(
                 sz[i][0],
                 sz[i+1][0], # layer dimension
-                act=sz[i+1][1] # activation function
+                act=sz[i+1][1], # activation function
+                **kwargs
             )
             for i in range(len(nouts))]
 
@@ -90,6 +70,11 @@ class MLP(Module):
 
     def parameters(self):
         return [p for layer in self.layers for p in layer.parameters()]
+
+    def learn(self, q=0.5):
+        for p in self.parameters():
+            p.learn()
+        self.zero_grad()
 
     def __repr__(self):
         return f"MLP of [{', '.join(str(layer) for layer in self.layers)}]"

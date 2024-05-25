@@ -3,7 +3,7 @@ import math
 class Value:
     """ stores a single scalar value and its gradient """
 
-    def __init__(self, data, _children=(), _op=''):
+    def __init__(self, data, _children=(), _op='', lr=None):
         self.data = data
         self.grad = 0.0
         self.pgrad = 0.0
@@ -11,7 +11,7 @@ class Value:
         self._backward = lambda: None
         self._prev = set(_children)
         self._op = _op # the op that produced this node, for graphviz / debugging / etc
-        self.lr = 1.0
+        self.lr = lr
 
     def __add__(self, other):
         other = other if isinstance(other, Value) else Value(other)
@@ -94,8 +94,8 @@ class Value:
             return
 
         # keep the step size stable
-        if abs(self.pgrad) > 0.0:
-            self.lr = abs(self.lr * self.pgrad / self.grad)
+        #if abs(self.pgrad) > 0.0:
+        #    self.lr = abs(self.lr * self.pgrad / self.grad)
 
         # if previous gradient has different sign then reduce the step size by q
         if self.pgrad * self.grad < 0:
