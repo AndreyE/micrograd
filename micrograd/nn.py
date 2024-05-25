@@ -56,7 +56,7 @@ class Layer(Module):
 
     def __call__(self, x):
         out = [n(x) for n in self.neurons]
-        return out[0] if len(out) == 1 else out
+        return out
 
     def parameters(self):
         return [p for n in self.neurons for p in n.parameters()]
@@ -74,10 +74,10 @@ class Layer(Module):
 class MLP(Module):
 
     def __init__(self, nin, nouts):
-        sz = [nin] + nouts
+        sz = [(nin, None)] + nouts
         self.layers = [
             Layer(
-                sz[i],
+                sz[i][0],
                 sz[i+1][0], # layer dimension
                 act=sz[i+1][1] # activation function
             )

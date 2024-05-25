@@ -100,6 +100,8 @@ class Value:
         # if previous gradient has different sign then reduce the step size by q
         if self.pgrad * self.grad < 0:
             self.lr *= q
+        else:
+            self.lr *= q ** -0.5
 
         self.data -= self.lr * self.grad
 
