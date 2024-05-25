@@ -1,18 +1,20 @@
+import numpy as np
 
 class Value:
     """ stores a single scalar value and its gradient """
 
-    def __init__(self, data, _children=(), _op=''):
+    def __init__(self, data, _children=(), _op='', _name='auto'):
         self.data = data
         self.grad = 0
         # internal variables used for autograd graph construction
         self._backward = lambda: None
         self._prev = set(_children)
         self._op = _op # the op that produced this node, for graphviz / debugging / etc
+        self._name = _name
 
     def __add__(self, other):
         other = other if isinstance(other, Value) else Value(other)
-        out = Value(self.data + other.data, (self, other), '+')
+        out = Value(self.data + other.data, (self, other), _op='+')
 
         def _backward():
             self.grad += out.grad
@@ -23,7 +25,7 @@ class Value:
 
     def __mul__(self, other):
         other = other if isinstance(other, Value) else Value(other)
-        out = Value(self.data * other.data, (self, other), '*')
+        out = Value(self.data * other.data, (self, other), _op='*')
 
         def _backward():
             self.grad += other.data * out.grad
@@ -34,7 +36,7 @@ class Value:
 
     def __pow__(self, other):
         assert isinstance(other, (int, float)), "only supporting int/float powers for now"
-        out = Value(self.data**other, (self,), f'**{other}')
+        out = Value(self.data**other, (self,), _op=f'**{other}')
 
         def _backward():
             self.grad += (other * self.data**(other-1)) * out.grad
@@ -43,10 +45,41 @@ class Value:
         return out
 
     def relu(self):
-        out = Value(0 if self.data < 0 else self.data, (self,), 'ReLU')
+        y = 0 if self.data < 0 else self.data
+        out = Value(y, (self,), _op='ReLU')
 
         def _backward():
-            self.grad += (out.data > 0) * out.grad
+            self.grad += (y > 0) * out.grad
+        out._backward = _backward
+
+        return out
+
+    def tanh(self):
+        y = np.tanh(self.data)
+        out = Value(y, (self,), _op='tanh')
+
+        def _backward():
+            self.grad += (1 - y**2) * out.grad
+        out._backward = _backward
+
+        return out
+
+    def exp(self):
+        y = np.exp(self.data)
+        out = Value(y, (self, ), _op='exp')
+
+        def _backward():
+            self.grad = y * out.grad
+        out._backward = _backward
+
+        return out
+
+    def sigmoid(self):
+        y = 1.0 / (1.0 + np.exp(-self.data))
+        out = Value(y, (self, ), _op='Sigmoid')
+
+        def _backward():
+            self.grad += y * (1 - y) * out.grad
         out._backward = _backward
 
         return out
@@ -68,6 +101,10 @@ class Value:
         self.grad = 1
         for v in reversed(topo):
             v._backward()
+
+    def learn(self, lr):
+        self.data += -lr * self.grad
+        self.grad = 0.0
 
     def __neg__(self): # -self
         return self * -1
@@ -91,4 +128,4 @@ class Value:
         return other * self**-1
 
     def __repr__(self):
-        return f"Value(data={self.data}, grad={self.grad})"
+        return f"Value(data={self.data}, grad={self.grad}, op={self._op})"

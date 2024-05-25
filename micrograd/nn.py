@@ -12,20 +12,29 @@ class Module:
 
 class Neuron(Module):
 
-    def __init__(self, nin, nonlin=True):
-        self.w = [Value(random.uniform(-1,1)) for _ in range(nin)]
-        self.b = Value(0)
-        self.nonlin = nonlin
+    def __init__(self, nin, act):
+        self.w = [Value(random.uniform(-1,1), _name='weight') for _ in range(nin)]
+        self.b = Value(random.uniform(-1,1), _name='bias')
+        self.act = act
 
     def __call__(self, x):
         act = sum((wi*xi for wi,xi in zip(self.w, x)), self.b)
-        return act.relu() if self.nonlin else act
+
+        if self.act == 'relu':
+            return act.relu()
+        elif self.act == 'tanh':
+            return act.tanh()
+        elif self.act == 'sigmoid':
+            return act.sigmoid()
+
+        assert self.act == 'linear'
+        return act
 
     def parameters(self):
         return self.w + [self.b]
 
     def __repr__(self):
-        return f"{'ReLU' if self.nonlin else 'Linear'}Neuron({len(self.w)})"
+        return f"{self.act}-Neuron({len(self.w)})"
 
 class Layer(Module):
 
@@ -34,7 +43,7 @@ class Layer(Module):
 
     def __call__(self, x):
         out = [n(x) for n in self.neurons]
-        return out[0] if len(out) == 1 else out
+        return out
 
     def parameters(self):
         return [p for n in self.neurons for p in n.parameters()]
@@ -45,8 +54,15 @@ class Layer(Module):
 class MLP(Module):
 
     def __init__(self, nin, nouts):
-        sz = [nin] + nouts
-        self.layers = [Layer(sz[i], sz[i+1], nonlin=i!=len(nouts)-1) for i in range(len(nouts))]
+        sz = [(nin, None)] + nouts
+        self.layers = [
+            Layer(
+                sz[i][0],
+                sz[i+1][0],
+                act=sz[i+1][1]
+            )
+            for i in range(len(nouts))
+        ]
 
     def __call__(self, x):
         for layer in self.layers:
@@ -55,6 +71,16 @@ class MLP(Module):
 
     def parameters(self):
         return [p for layer in self.layers for p in layer.parameters()]
+
+    def learn_from(self, loss: Value, lr: float):
+        # zero grad
+        for p in self.parameters():
+            p.grad = 0.0
+        # propagate grad
+        loss.backward()
+        # learn
+        for p in self.parameters():
+            p.learn(lr)
 
     def __repr__(self):
         return f"MLP of [{', '.join(str(layer) for layer in self.layers)}]"
