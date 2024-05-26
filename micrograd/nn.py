@@ -12,9 +12,9 @@ class Module:
 
 class Neuron(Module):
 
-    def __init__(self, nin, act):
-        self.w = [Value(random.uniform(-1,1), _name='weight') for _ in range(nin)]
-        self.b = Value(random.uniform(-1,1), _name='bias')
+    def __init__(self, nin, act, **kwargs):
+        self.w = [Value(random.uniform(-1,1), _name='weight', **kwargs) for _ in range(nin)]
+        self.b = Value(random.uniform(-1,1), _name='bias', **kwargs)
         self.act = act
 
     def __call__(self, x):
@@ -53,13 +53,14 @@ class Layer(Module):
 
 class MLP(Module):
 
-    def __init__(self, nin, nouts):
+    def __init__(self, nin, nouts, lr):
         sz = [(nin, None)] + nouts
         self.layers = [
             Layer(
                 sz[i][0],
                 sz[i+1][0],
-                act=sz[i+1][1]
+                act=sz[i+1][1],
+                _lr=lr
             )
             for i in range(len(nouts))
         ]
@@ -72,15 +73,12 @@ class MLP(Module):
     def parameters(self):
         return [p for layer in self.layers for p in layer.parameters()]
 
-    def learn_from(self, loss: Value, lr: float):
-        # zero grad
-        for p in self.parameters():
-            p.grad = 0.0
+    def learn_from(self, loss: Value, q: float):
         # propagate grad
         loss.backward()
         # learn
         for p in self.parameters():
-            p.learn(lr)
+            p.learn(q)
 
     def __repr__(self):
         return f"MLP of [{', '.join(str(layer) for layer in self.layers)}]"

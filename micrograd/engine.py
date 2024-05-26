@@ -3,7 +3,7 @@ import numpy as np
 class Value:
     """ stores a single scalar value and its gradient """
 
-    def __init__(self, data, _children=(), _op='', _name='auto'):
+    def __init__(self, data, _children=(), _op='', _name='auto', _lr=1.0):
         self.data = data
         self.grad = 0
         # internal variables used for autograd graph construction
@@ -11,6 +11,8 @@ class Value:
         self._prev = set(_children)
         self._op = _op # the op that produced this node, for graphviz / debugging / etc
         self._name = _name
+        self._lr = _lr
+        self._pgrad = 0.0
 
     def __add__(self, other):
         other = other if isinstance(other, Value) else Value(other)
@@ -39,7 +41,8 @@ class Value:
         out = Value(self.data**other, (self,), _op=f'**{other}')
 
         def _backward():
-            self.grad += (other * self.data**(other-1)) * out.grad
+            if self.data != 0.0:
+                self.grad += (other * self.data**(other-1)) * out.grad
         out._backward = _backward
 
         return out
@@ -102,9 +105,29 @@ class Value:
         for v in reversed(topo):
             v._backward()
 
-    def learn(self, lr):
-        self.data += -lr * self.grad
+    def zero_grad(self):
+        self._pgrad = self.grad
         self.grad = 0.0
+
+    def learn(self, q = 0.5):
+        assert q <= 1
+
+        if self.grad == 0.0:
+            return
+
+        # keep the stride stable
+        # if self._pgrad > 0.0:
+        #    self._lr = abs(self._lr * self._pgrad / self.grad)
+
+        # if previous gradient has different sign then reduce the step size by q
+        if self._pgrad * self.grad < 0:
+            self._lr *= q
+        else:
+            self._lr *= q ** -0.5
+
+        self.data -= self._lr * self.grad
+        self.zero_grad()
+
 
     def __neg__(self): # -self
         return self * -1
@@ -128,4 +151,4 @@ class Value:
         return other * self**-1
 
     def __repr__(self):
-        return f"Value(data={self.data}, grad={self.grad}, op={self._op})"
+        return f"Value({self._name} : [{self.data}, {self.grad}])"
