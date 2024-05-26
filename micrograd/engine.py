@@ -97,6 +97,11 @@ class Value:
         out._op = 'xspace'
         return out
 
+    def pxspace(self):
+        out = (self.xspace() + 1) / 2
+        out._op = '+xspace'
+        return out
+
     def backward(self):
 
         # topological order all of the children in the graph
@@ -133,7 +138,7 @@ class Value:
         if self._pgrad * self.grad < 0:
             self._lr *= q
         else:
-            self._lr *= q ** -0.5
+            self._lr /= q # if learning is stuck try `q ** -(1/2)`
 
         self.data -= self._lr * self.grad
 

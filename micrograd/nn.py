@@ -30,6 +30,8 @@ class Neuron(Module):
             return act.squeeze()
         elif self.act == 'xspace':
             return act.xspace()
+        elif self.act == '+xspace':
+            return act.pxspace()
 
         assert self.act == 'linear'
         return act
@@ -77,7 +79,7 @@ class MLP(Module):
     def parameters(self):
         return [p for layer in self.layers for p in layer.parameters()]
 
-    def learn_from(self, loss: Value, q: float):
+    def learn_from(self, loss: Value, q: float = 0.5):
         # propagate grad
         self.zero_grad()
         loss.backward()
