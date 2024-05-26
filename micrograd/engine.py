@@ -5,7 +5,7 @@ class Value:
 
     def __init__(self, data, _children=(), _op='', _name='auto', _lr=1.0):
         self.data = data
-        self.grad = 0
+        self.grad = 0.0
         # internal variables used for autograd graph construction
         self._backward = lambda: None
         self._prev = set(_children)
@@ -13,8 +13,6 @@ class Value:
         self._name = _name
         self._lr = _lr
         self._pgrad = 0.0
-        self._min = min(-1, -abs(data))
-        self._space = self._min * -2
 
     def __add__(self, other):
         other = other if isinstance(other, Value) else Value(other)
@@ -94,6 +92,10 @@ class Value:
         out._op = 'squeeze'
         return out
 
+    def xspace(self):
+        out = self / abs(self.data)
+        out._op = 'xspace'
+        return out
 
     def backward(self):
 
@@ -124,8 +126,8 @@ class Value:
             return
 
         # keep the stride stable
-        if self._pgrad > 0.0:
-            self._lr = abs(self._lr * self._pgrad / self.grad)
+        # if self._pgrad > 0.0:
+        #    self._lr = abs(self._lr * self._pgrad / self.grad)
 
         # if previous gradient has different sign then reduce the step size by q
         if self._pgrad * self.grad < 0:
@@ -134,10 +136,6 @@ class Value:
             self._lr *= q ** -0.5
 
         self.data -= self._lr * self.grad
-        self.min = min(self.data, self._min)
-        self._space = max(self.data - self._min, self._space)
-
-
 
     def __neg__(self): # -self
         return self * -1

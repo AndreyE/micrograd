@@ -28,6 +28,8 @@ class Neuron(Module):
             return act.sigmoid()
         elif self.act == 'squeeze':
             return act.squeeze()
+        elif self.act == 'xspace':
+            return act.xspace()
 
         assert self.act == 'linear'
         return act
