@@ -5,7 +5,7 @@ class Module:
 
     def zero_grad(self):
         for p in self.parameters():
-            p.grad = 0
+            p.zero_grad()
 
     def parameters(self):
         return []
@@ -26,6 +26,8 @@ class Neuron(Module):
             return act.tanh()
         elif self.act == 'sigmoid':
             return act.sigmoid()
+        elif self.act == 'squeeze':
+            return act.squeeze()
 
         assert self.act == 'linear'
         return act
@@ -75,6 +77,7 @@ class MLP(Module):
 
     def learn_from(self, loss: Value, q: float):
         # propagate grad
+        self.zero_grad()
         loss.backward()
         # learn
         for p in self.parameters():

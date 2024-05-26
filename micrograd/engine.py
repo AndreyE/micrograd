@@ -13,6 +13,8 @@ class Value:
         self._name = _name
         self._lr = _lr
         self._pgrad = 0.0
+        self._min = min(-1, -abs(data))
+        self._space = self._min * -2
 
     def __add__(self, other):
         other = other if isinstance(other, Value) else Value(other)
@@ -87,6 +89,12 @@ class Value:
 
         return out
 
+    def squeeze(self):
+        out = ((self - self._min) / self._space) * 2 - 1
+        out._op = 'squeeze'
+        return out
+
+
     def backward(self):
 
         # topological order all of the children in the graph
@@ -116,8 +124,8 @@ class Value:
             return
 
         # keep the stride stable
-        # if self._pgrad > 0.0:
-        #    self._lr = abs(self._lr * self._pgrad / self.grad)
+        if self._pgrad > 0.0:
+            self._lr = abs(self._lr * self._pgrad / self.grad)
 
         # if previous gradient has different sign then reduce the step size by q
         if self._pgrad * self.grad < 0:
@@ -126,7 +134,9 @@ class Value:
             self._lr *= q ** -0.5
 
         self.data -= self._lr * self.grad
-        self.zero_grad()
+        self.min = min(self.data, self._min)
+        self._space = max(self.data - self._min, self._space)
+
 
 
     def __neg__(self): # -self
