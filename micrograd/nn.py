@@ -87,9 +87,10 @@ class MLP(Module):
         for p in self.parameters():
             p.learn(q)
 
+    def norm(self):
         for layer in self.layers:
             for neuron in layer.neurons:
-                norm = sum(abs(p.data) for p in neuron.parameters())
+                norm = len(neuron.parameters())
                 for p in neuron.parameters():
                     p.data /= norm
 
