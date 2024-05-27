@@ -87,5 +87,11 @@ class MLP(Module):
         for p in self.parameters():
             p.learn(q)
 
+        for layer in self.layers:
+            for neuron in layer.neurons:
+                norm = sum(abs(p.data) for p in neuron.parameters())
+                for p in neuron.parameters():
+                    p.data /= norm
+
     def __repr__(self):
         return f"MLP of [{', '.join(str(layer) for layer in self.layers)}]"
