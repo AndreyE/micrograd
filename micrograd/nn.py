@@ -1,4 +1,6 @@
 import random
+import numpy as np
+
 from micrograd.engine import Value
 
 class Module:
@@ -90,9 +92,11 @@ class MLP(Module):
     def norm(self):
         for layer in self.layers:
             for neuron in layer.neurons:
-                norm = len(neuron.parameters())
+                params = np.array([p.data for p in neuron.parameters()])
+                norm = np.std(params)
                 for p in neuron.parameters():
                     p.data /= norm
+                    p._lr /= norm
 
     def __repr__(self):
         return f"MLP of [{', '.join(str(layer) for layer in self.layers)}]"

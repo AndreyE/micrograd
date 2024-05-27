@@ -124,7 +124,7 @@ class Value:
         self._pgrad = self.grad
         self.grad = 0.0
 
-    def learn(self, q = 0.5):
+    def learn(self, q=0.5):
         assert q <= 1
 
         if self.grad == 0.0:
@@ -138,7 +138,7 @@ class Value:
         if self._pgrad * self.grad < 0:
             self._lr *= q
         else:
-            self._lr /= q ** -(1/4) # if learning is stuck try `q ** -(1/2)`
+            self._lr *= q  ** -(1/2)
 
         self.data -= self._lr * self.grad
 
