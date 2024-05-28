@@ -72,6 +72,7 @@ class MLP(Module):
             )
             for i in range(len(nouts))
         ]
+        self.norm()
 
     def __call__(self, x):
         for layer in self.layers:
