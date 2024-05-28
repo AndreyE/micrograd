@@ -4,7 +4,7 @@ class Value:
     """ stores a single scalar value and its gradient """
 
     def __init__(self, data, _children=(), _op='', _name='auto', _lr=1.0):
-        self.data = data
+        self.data = float(data)
         self.grad = 0.0
         # internal variables used for autograd graph construction
         self._backward = lambda: None
