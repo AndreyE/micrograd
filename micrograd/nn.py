@@ -96,9 +96,10 @@ class MLP(Module):
             for neuron in layer.neurons:
                 params = np.array([p.data for p in neuron.parameters()])
                 norm = np.std(params)
-                for p in neuron.parameters():
-                    p.data /= norm
-                    p._lr /= norm
+                if norm > 0.0:
+                    for p in neuron.parameters():
+                        p.data /= norm
+                        p._lr /= norm
 
     def __repr__(self):
         return f"MLP of [{', '.join(str(layer) for layer in self.layers)}]"
