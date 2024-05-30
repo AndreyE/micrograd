@@ -99,7 +99,7 @@ class MLP(Module):
                 if norm > 0.0:
                     for p in neuron.parameters():
                         p.data /= norm
-                        p._lr /= norm
+                        # p._lr /= norm
 
     def __repr__(self):
         return f"MLP of [{', '.join(str(layer) for layer in self.layers)}]"
