@@ -95,6 +95,7 @@ class Value:
     def xspace(self):
         out = self / abs(self.data)
         out._op = 'xspace'
+        out.data = np.round(out.data)
         return out
 
     def pxspace(self):
