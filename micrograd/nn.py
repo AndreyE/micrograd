@@ -1,6 +1,5 @@
 import random
 import numpy as np
-
 from micrograd.engine import Value
 
 class Module:
@@ -18,6 +17,7 @@ class Neuron(Module):
         self.w = [Value(init(), _name='weight', **kwargs) for _ in range(nin)]
         self.b = Value(init(), _name='bias', **kwargs)
         self.act = act
+        self._history = []
 
     def __call__(self, x):
         act = sum((wi*xi for wi,xi in zip(self.w, x)), self.b)
@@ -83,13 +83,16 @@ class MLP(Module):
     def parameters(self):
         return [p for layer in self.layers for p in layer.parameters()]
 
-    def learn_from(self, loss: Value, q: float = 0.5):
+    def learn_from(self, loss: Value, q: float = 0.5, norm=True):
         # propagate grad
         self.zero_grad()
         loss.backward()
         # learn
         for p in self.parameters():
             p.learn(q)
+
+        if norm:
+            self.norm()
 
     def norm(self):
         for layer in self.layers:

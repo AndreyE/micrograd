@@ -93,6 +93,8 @@ class Value:
         return out
 
     def xspace(self):
+        if self.data == 0:
+            return self
         out = self / abs(self.data)
         out._op = 'xspace'
         out.data = np.round(out.data)
@@ -165,4 +167,4 @@ class Value:
         return other * self**-1
 
     def __repr__(self):
-        return f"Value({self._name} : [{self.data}, {self.grad}])"
+        return f"Value({self._name} : [{self.data}, {self.grad}, {self._lr}])"
