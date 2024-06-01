@@ -34,6 +34,10 @@ class Neuron(Module):
             return act.xspace()
         elif self.act == '+xspace':
             return act.pxspace()
+        elif self.act == 'minmax':
+            key = lambda p: p.data
+            minmax = max(self.parameters(), key=key) - min(self.parameters(), key=key)
+            return act / minmax
 
         assert self.act == 'linear'
         return act
