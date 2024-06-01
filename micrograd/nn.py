@@ -102,7 +102,7 @@ class MLP(Module):
         for layer in self.layers:
             for neuron in layer.neurons:
                 params = np.array([p.data for p in neuron.parameters()])
-                norm = np.std(params)
+                norm = params.max() - params.min()
                 if norm > 0.0:
                     for p in neuron.parameters():
                         p.data /= norm
