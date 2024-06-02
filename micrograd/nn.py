@@ -13,9 +13,9 @@ class Module:
 
 class Neuron(Module):
 
-    def __init__(self, nin, act, init=lambda: random.uniform(-1,1), **kwargs):
-        self.w = [Value(init(), _name='weight', **kwargs) for _ in range(nin)]
-        self.b = Value(init(), _name='bias', **kwargs)
+    def __init__(self, nin, act, init=lambda: random.uniform(-1,1), _lid='', _nid='', **kwargs):
+        self.w = [Value(init(), _name=f'L{_lid}-n{_nid}-w{w}', **kwargs) for w in range(nin)]
+        self.b = Value(init(), _name=f'L{_lid}-n{_nid}-b', **kwargs)
         self.act = act
         self._history = []
 
@@ -51,7 +51,7 @@ class Neuron(Module):
 class Layer(Module):
 
     def __init__(self, nin, nout, **kwargs):
-        self.neurons = [Neuron(nin, **kwargs) for _ in range(nout)]
+        self.neurons = [Neuron(nin, _nid=n, **kwargs) for n in range(nout)]
 
     def __call__(self, x):
         out = [n(x) for n in self.neurons]
@@ -72,6 +72,7 @@ class MLP(Module):
                 sz[i][0],
                 sz[i+1][0],
                 act=sz[i+1][1],
+                _lid=i,
                 _lr=lr,
                 **kwargs
             )
