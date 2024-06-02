@@ -3,7 +3,7 @@ import numpy as np
 class Value:
     """ stores a single scalar value and its gradient """
 
-    def __init__(self, data, _children=(), _op='', _name='auto', _lr=1.0):
+    def __init__(self, data, _children=(), lr=1.0, _op='', _name='auto'):
         self.data = np.float64(data)
         self.grad = 0.0
         # internal variables used for autograd graph construction
@@ -11,7 +11,7 @@ class Value:
         self._prev = set(_children)
         self._op = _op # the op that produced this node, for graphviz / debugging / etc
         self._name = _name
-        self._lr = _lr
+        self._lr = lr
         self._pgrad = 0.0
 
     def __add__(self, other):
@@ -85,24 +85,6 @@ class Value:
             self.grad += y * (1 - y) * out.grad
         out._backward = _backward
 
-        return out
-
-    def squeeze(self):
-        out = ((self - self._min) / self._space) * 2 - 1
-        out._op = 'squeeze'
-        return out
-
-    def xspace(self):
-        if self.data == 0:
-            return self
-        out = self / abs(self.data)
-        out._op = 'xspace'
-        out.data = np.round(out.data)
-        return out
-
-    def pxspace(self):
-        out = (self.xspace() + 1) / 2
-        out._op = '+xspace'
         return out
 
     def backward(self):

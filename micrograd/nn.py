@@ -12,46 +12,74 @@ class Module:
         return []
 
 class Neuron(Module):
+    EPS = 1e-3
 
-    def __init__(self, nin, act, init=lambda: random.uniform(-1,1), _lid='', _nid='', **kwargs):
-        self.w = [Value(init(), _name=f'L{_lid}-n{_nid}-w{w}', **kwargs) for w in range(nin)]
-        self.b = Value(init(), _name=f'L{_lid}-n{_nid}-b', **kwargs)
-        self.act = act
-        self._history = []
+    def __init__(self, nin, act, bias=True, init=lambda: random.uniform(-1,1), _lid='', _nid='', **kwargs):
+        self.id = f'L{_lid}:n{_nid}->{act}({nin})'
+        self.w = [Value(init(), _name=f'L{_lid}:n{_nid}:w{w}', **kwargs) for w in range(nin)]
+        self.b = Value(init(), _name=f'L{_lid}:n{_nid}:b', **kwargs) if bias else None
+
+        self._activate = self._pick_activation(act)
+        self._history = [] # TODO
 
     def __call__(self, x):
-        act = sum((wi*xi for wi,xi in zip(self.w, x)), self.b)
+        return self._activate(x)
 
-        if self.act == 'relu':
-            return act.relu()
-        elif self.act == 'tanh':
-            return act.tanh()
-        elif self.act == 'sigmoid':
-            return act.sigmoid()
-        elif self.act == 'squeeze':
-            return act.squeeze()
-        elif self.act == 'xspace':
-            return act.xspace()
-        elif self.act == '+xspace':
-            return act.pxspace()
-        elif self.act == 'minmax':
-            key = lambda p: p.data
-            minmax = max(self.parameters(), key=key) - min(self.parameters(), key=key)
-            return act / minmax
+    def _pick_activation(self, act='line'):
+        if act == 'line':
+            return self._line
+        elif act == 'sbin':
+            return self._sbin
+        elif act == 'bin':
+            return self._bin
+        elif act == 'minmax':
+            return self._minmax
 
-        assert self.act == 'linear'
+        assert False, f'Unsupported activation function {act}'
+
+    def _line(self, x):
+        act = sum(wi*xi for wi,xi in zip(self.w, x))
+        if self.b is not None:
+            act += self.b
         return act
 
+    def _sbin(self, x):
+        act = self._line(x)
+        if abs(act.data) < Neuron.EPS:
+            act.data = round(act.data)
+            return act # line if too close to zero
+
+        act = act / abs(act.data)
+        act._op = 'sbin'
+        act.data = np.round(act.data) # round to {-1, 1}
+        return act
+
+    def _bin(self, x):
+        act = (self._sbin(x) + 1) / 2
+        act._op = 'bin'
+        act.data = np.round(act.data) # round to {0, 1}
+        return act
+
+    def _minmax(self, x):
+        key = lambda p: p.data
+        minmax = max(self.parameters(), key=key) - min(self.parameters(), key=key)
+        return self._line(x) / minmax
+
     def parameters(self):
-        return self.w + [self.b]
+        if self.b is None:
+            return self.w
+        else:
+            return self.w + [self.b]
 
     def __repr__(self):
-        return f"{self.act}-Neuron({len(self.w)})"
+        return self.id
 
 class Layer(Module):
 
-    def __init__(self, nin, nout, **kwargs):
-        self.neurons = [Neuron(nin, _nid=n, **kwargs) for n in range(nout)]
+    def __init__(self, shape, act, _lid=None, **kwargs):
+        nin, nout = shape
+        self.neurons = [Neuron(nin, act, _nid=n, _lid=_lid, **kwargs) for n in range(nout)]
+        self._lid = _lid
 
     def __call__(self, x):
         out = [n(x) for n in self.neurons]
@@ -61,24 +89,12 @@ class Layer(Module):
         return [p for n in self.neurons for p in n.parameters()]
 
     def __repr__(self):
-        return f"Layer of [{', '.join(str(n) for n in self.neurons)}]"
+        return f"Layer L{self._lid} of [{', '.join(str(n) for n in self.neurons)}]"
 
 class MLP(Module):
 
-    def __init__(self, nin, nouts, lr, **kwargs):
-        sz = [(nin, None)] + nouts
-        self.layers = [
-            Layer(
-                sz[i][0],
-                sz[i+1][0],
-                act=sz[i+1][1],
-                _lid=i,
-                _lr=lr,
-                **kwargs
-            )
-            for i in range(len(nouts))
-        ]
-        # self.norm()
+    def __init__(self, layers):
+        self.layers = layers
 
     def __call__(self, x):
         for layer in self.layers:
