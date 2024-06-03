@@ -3,11 +3,6 @@ import numpy as np
 from micrograd.engine import Value
 
 class Module:
-
-    def zero_grad(self):
-        for p in self.parameters():
-            p.zero_grad()
-
     def parameters(self):
         return []
 
@@ -116,14 +111,13 @@ class MLP(Module):
     def parameters(self):
         return [p for layer in self.layers for p in layer.parameters()]
 
-    def learn_from(self, loss: Value, q: float = 1.0, norm=True):
+    def learn_from(self, loss: Value, q: float = 1.0, logging=False, norm=False):
         # propagate grad
-        self.zero_grad()
-        loss.backward()
+        loss.backward(logging=logging)
         # learn
         for p in self.parameters():
-            p.learn(q)
-
+            p.learn(q=q, logging=logging)
+        # normalize output
         if norm:
             self.norm()
 
