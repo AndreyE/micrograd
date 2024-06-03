@@ -20,6 +20,8 @@ class Neuron(Module):
         self.b = Value(init(), _name=f'L{_lid}:n{_nid}:b', **kwargs) if bias else None
 
         self._activate = self._pick_activation(act)
+        self._lid = _lid
+        self._nid = _nid
         self._history = [] # TODO
 
     def __call__(self, x):
@@ -38,18 +40,24 @@ class Neuron(Module):
         assert False, f'Unsupported activation function {act}'
 
     def _line(self, x):
-        act = sum(wi*xi for wi,xi in zip(self.w, x))
+        assert len(self.w) == len(x), f'L{self._lid}:n{self._nid} <- {len(self.w)} != {len(x)}'
+
+        act = self.w[0] * x[0]
+        for i in range(1, len(self.w)):
+            act += self.w[i] * x[i]
+
         if self.b is not None:
             act += self.b
+
+        act._op = 'line'
         return act
 
     def _sbin(self, x):
         act = self._line(x)
-        if abs(act.data) < Neuron.EPS:
-            act.data = round(act.data)
-            return act # line if too close to zero
+        if abs(act.data) < Neuron.EPS: # if too close to zero
+            return act
 
-        act = act / abs(act.data)
+        act = act / act.abs()
         act._op = 'sbin'
         act.data = np.round(act.data) # round to {-1, 1}
         return act
@@ -61,9 +69,13 @@ class Neuron(Module):
         return act
 
     def _minmax(self, x):
+        act = self._line(x)
+        if abs(act.data) < Neuron.EPS: # if too close to zero
+            return act
+
         key = lambda p: p.data
         minmax = max(self.parameters(), key=key) - min(self.parameters(), key=key)
-        return self._line(x) / minmax
+        return act / minmax
 
     def parameters(self):
         if self.b is None:
@@ -104,7 +116,7 @@ class MLP(Module):
     def parameters(self):
         return [p for layer in self.layers for p in layer.parameters()]
 
-    def learn_from(self, loss: Value, q: float = 0.5, norm=True):
+    def learn_from(self, loss: Value, q: float = 1.0, norm=True):
         # propagate grad
         self.zero_grad()
         loss.backward()
