@@ -53,24 +53,26 @@ class Neuron(Module):
             return act
 
         act = act / act.abs()
-        act._op = 'sbin'
+        act._name = 'sbin'
         act.data = np.round(act.data) # round to {-1, 1}
         return act
 
     def _bin(self, x):
         act = (self._sbin(x) + 1) / 2
-        act._op = 'bin'
+        act._name = 'bin'
         act.data = np.round(act.data) # round to {0, 1}
         return act
 
     def _minmax(self, x):
-        act = self._line(x)
-        if abs(act.data) < Neuron.EPS: # if too close to zero
-            return act
+        params = np.array([p.data for p in self.parameters()])
+        minmax = params.max() - params.min()
 
-        key = lambda p: p.data
-        minmax = max(self.parameters(), key=key) - min(self.parameters(), key=key)
-        return act / minmax
+        if minmax < Neuron.EPS:
+            out = self._line(x)
+        else:
+            out = self._line(x) / minmax
+            out._name = 'minmax'
+        return out
 
     def parameters(self):
         if self.b is None:
@@ -125,7 +127,7 @@ class MLP(Module):
         for layer in self.layers:
             for neuron in layer.neurons:
                 params = np.array([p.data for p in neuron.parameters()])
-                norm = params.max() - params.min()
+                norm = params.std()
                 if norm > 0.0:
                     for p in neuron.parameters():
                         p.data /= norm

@@ -163,7 +163,10 @@ class Value:
         return self * other
 
     def __truediv__(self, other): # self / other
-        return self * other**-1
+        out = self * other**-1
+        out._op = '/'
+        out._name = 'div'
+        return out
 
     def __rtruediv__(self, other): # other / self
         return other * self**-1
