@@ -9,18 +9,34 @@ class Module:
 class Neuron(Module):
     EPS = 1e-3
 
-    def __init__(self, nin, act, bias=True, init=lambda: random.uniform(-1,1), _lid='', _nid='', **kwargs):
+    def __init__(self, nin, act, bias=False, init=lambda: 0.0, _lid='', _nid='', **kwargs):
         self.id = f'L{_lid}:n{_nid}->{act}({nin})'
         self.w = [Value(init(), _name=f'L{_lid}:n{_nid}:w{w}', **kwargs) for w in range(nin)]
         self.b = Value(init(), _name=f'L{_lid}:n{_nid}:b', **kwargs) if bias else None
 
+        self._train = False
         self._activate = self._pick_activation(act)
         self._lid = _lid
         self._nid = _nid
-        self._history = [] # TODO
+        self._std = 0.0
 
-    def __call__(self, x):
-        return self._activate(x)
+    def __call__(self, X):
+        outs = []
+        for xi in X:
+            assert len(xi), xi
+            outs.append(self._activate(xi))
+
+        if self._train:
+            data = np.array([o.data for o in outs])
+            self._std = data.std()
+            print(f'debug: std = {self._std}')
+
+            if self._std > 1.0:
+                for out in outs:
+                    out /= self._std
+
+        return outs
+
 
     def _pick_activation(self, act='line'):
         if act == 'line':
@@ -37,7 +53,7 @@ class Neuron(Module):
         assert False, f'Unsupported activation function {act}'
 
     def _line(self, x):
-        assert len(self.w) == len(x), f'L{self._lid}:n{self._nid} <- {len(self.w)} != {len(x)}'
+        assert len(self.w) == len(x), f'w[{len(self.w)}] != x[{len(x)}])'
 
         act = self.w[0] * x[0]
         for i in range(1, len(self.w)):
@@ -99,9 +115,10 @@ class Layer(Module):
         self.neurons = [Neuron(nin, act, _nid=n, _lid=_lid, **kwargs) for n in range(nout)]
         self._lid = _lid
 
-    def __call__(self, x):
-        out = [n(x) for n in self.neurons]
-        return out
+    def __call__(self, X):
+        outs = [n(X) for n in self.neurons]
+        outs = list(zip(*outs))
+        return outs
 
     def parameters(self):
         return [p for n in self.neurons for p in n.parameters()]
@@ -111,36 +128,61 @@ class Layer(Module):
 
 class MLP(Module):
 
-    def __init__(self, layers):
+    def __init__(self, layers, train):
         self.layers = layers
+        self.set_train(train)
 
-    def __call__(self, x):
+    def __call__(self, X):
         for layer in self.layers:
-            x = layer(x)
-        return x
+            X = layer(X)
+        return X
+
+    def set_train(self, train: bool):
+        self._train = train
+        for n in self.neurons():
+            n._train = train
 
     def parameters(self):
         return [p for layer in self.layers for p in layer.parameters()]
 
-    def learn_from(self, loss: Value, q: float = 1.0, norm=True, logging=False):
+    def neurons(self):
+        return [n for layer in self.layers for n in layer.neurons]
+
+    def learn_from(self, loss: Value, q: float = 1.0, logging=False, lr=None):
         # propagate grad
         loss.backward(logging=logging)
         # learn
         for p in self.parameters():
-            p.learn(q=q, logging=logging)
-        # normalize output
-        if norm:
-            self.norm()
+            p.learn(q=q, logging=logging, lr=lr)
+        if self._train:
+            self._imbue()
 
-    def norm(self):
-        for layer in self.layers:
-            for neuron in layer.neurons:
-                params = np.array([p.data for p in neuron.parameters()])
-                norm = (max(params.max(), 0.0) - min(0.0, params.min())) / 2.0
-                if norm > 0.0:
-                    for p in neuron.parameters():
-                        p.data /= norm
-                        # p._lr /= norm
+    def _imbue(self):
+        for n in self.neurons():
+            if n._std <= 1.0:
+                continue
+            for p in n.parameters():
+                p.data /= n._space
+
+    def make_learner(self, X, get_loss):
+        scores = self(X)
+        current_loss = get_loss(scores)
+
+        def learner(i=1, q=1.0, logging=False):
+            nonlocal current_loss
+            nonlocal scores
+
+            for k in range(i):
+                print(f'{k} loss: {current_loss.data}')
+                self.learn_from(current_loss, logging=logging, q=q) # , lr=starting_loss/current_loss.data)
+
+                scores = self(X)
+                current_loss = get_loss(scores)
+
+            print(f'final loss: {current_loss.data}')
+            return current_loss, scores
+
+        return learner
 
     def __repr__(self):
         return f"MLP of [{', '.join(str(layer) for layer in self.layers)}]"

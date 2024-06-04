@@ -130,18 +130,21 @@ class Value:
         self._pgrad = self.grad
         self.grad = 0.0
 
-    def learn(self, q=1.0, logging=False):
+    def learn(self, q=1.0, logging=False, lr=None):
         assert q <= 1
 
         # if previous gradient has different sign then reduce the step size by q
-        if self._pgrad * self.grad < 0:
-            self._lr *= q
-        else:
-            self._lr *= q  ** -(1/2)
+        if lr is None:
+            if self._pgrad * self.grad < 0:
+                self._lr *= q
+            else:
+                self._lr *= q  ** -(1/2)
+            lr = self._lr
 
-        data = self.data - self._lr * self.grad
+        data = self.data - lr * self.grad
+
         if logging:
-            print(f'learn:{self._name}[data[{data} <- {self.data}+{-(self._lr * self.grad)}]')
+            print(f'learn:{self._name}[data[{data} <- {self.data}+{-(lr * self.grad)}]')
         self.data = data
 
     def __neg__(self): # -self
