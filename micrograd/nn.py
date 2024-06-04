@@ -31,6 +31,8 @@ class Neuron(Module):
             return self._bin
         elif act == 'minmax':
             return self._minmax
+        elif act == 'snap':
+            return self._snap
 
         assert False, f'Unsupported activation function {act}'
 
@@ -52,15 +54,22 @@ class Neuron(Module):
         if abs(act.data) < Neuron.EPS: # if too close to zero
             return act
 
-        act = act / act.abs()
+        act = act / abs(act.data)
         act._name = 'sbin'
-        act.data = np.round(act.data) # round to {-1, 1}
         return act
 
     def _bin(self, x):
         act = (self._sbin(x) + 1) / 2
         act._name = 'bin'
         act.data = np.round(act.data) # round to {0, 1}
+        return act
+
+    def _snap(self, x): # WARN: not working
+        act = self._line(x)
+        if abs(act.data) > 0.5:
+            act = act / abs(act.data)
+        else:
+            act *= 0.0
         return act
 
     def _minmax(self, x):
@@ -113,7 +122,7 @@ class MLP(Module):
     def parameters(self):
         return [p for layer in self.layers for p in layer.parameters()]
 
-    def learn_from(self, loss: Value, q: float = 1.0, logging=False, norm=False):
+    def learn_from(self, loss: Value, q: float = 1.0, norm=True, logging=False):
         # propagate grad
         loss.backward(logging=logging)
         # learn
@@ -127,7 +136,7 @@ class MLP(Module):
         for layer in self.layers:
             for neuron in layer.neurons:
                 params = np.array([p.data for p in neuron.parameters()])
-                norm = params.std()
+                norm = (max(params.max(), 0.0) - min(0.0, params.min())) / 2.0
                 if norm > 0.0:
                     for p in neuron.parameters():
                         p.data /= norm

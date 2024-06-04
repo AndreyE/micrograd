@@ -5,12 +5,12 @@ import logging
 class Value:
     """ stores a single scalar value and its gradient """
 
-    def __init__(self, data, _children=(), lr=1.0, _op='', _name='auto'):
+    def __init__(self, data, _children=[], lr=1.0, _op='', _name='auto'):
         self.data = np.float64(data)
         self.grad = 0.0
         # internal variables used for autograd graph construction
         self._backward = lambda: None
-        self._prev = set(_children)
+        self._prev = _children
         self._op = _op # the op that produced this node, for graphviz / debugging / etc
         self._name = _name
         self._lr = lr
@@ -51,6 +51,9 @@ class Value:
         out._backward = _backward
 
         return out
+
+    def child(self, idx):
+        return self._prev[idx]
 
     def zero(self):
         out = self - self
@@ -98,13 +101,7 @@ class Value:
         return out
 
     def abs(self):
-        if self.data >= 0:
-            self._op = 'abs'
-            return self
-        else:
-            out = -self
-            out._op = 'abs'
-            return out
+        return (self**2)**0.5
 
     def backward(self, logging=False):
 
@@ -149,8 +146,8 @@ class Value:
 
     def __neg__(self): # -self
         out = self * Value(-1, _name='-1')
-        out._op = 'neg'
-        out._name = f'neg:{self._name}'
+        out._op = '*(-1)'
+        out._name = f'neg-{self._name}'
         return out
 
     def __radd__(self, other): # other + self
