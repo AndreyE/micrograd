@@ -18,25 +18,23 @@ class Neuron(Module):
         self._activate = self._pick_activation(act, debug=False)
         self._lid = _lid
         self._nid = _nid
-        self._norm = 0.0
 
     def __call__(self, X):
-        outs = []
+        acts = []
         for xi in X:
             assert len(xi), xi
-            outs.append(self._activate(xi))
+            acts.append(self._activate(xi))
 
-        if self._train:
-            data = np.array([o.data for o in outs])
+        if self._activate == self._line:
+            data = np.array([act.data for act in acts])
             self._minmax = (data.min(), data.max())
             space = self._minmax[1] - self._minmax[0]
             print(f'debug: minmax = {self._minmax}, space = {space}')
 
-            if self._norm > 1.0:
-                for out in outs:
-                    out /= space
+            if space != 0.0:
+                return [act / space for act in acts]
 
-        return outs
+        return acts
 
     def set_train(self, train: bool):
         if self._activate == self._line:
@@ -83,6 +81,7 @@ class Neuron(Module):
         if self.b is not None:
             act += self.b
 
+        act._name = 'line'
         act._op = 'line'
         return act
 
