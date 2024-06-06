@@ -176,7 +176,7 @@ class MLP(Module):
         for p in self.parameters():
             p.learn(q=q, logging=logging, LR=LR)
 
-    def make_learner(self, X, get_loss, LR=None):
+    def make_learner(self, X, get_loss, ESAT=None, LR=None):
         scores = self(X)
         current_loss = get_loss(scores)
 
@@ -184,6 +184,7 @@ class MLP(Module):
             nonlocal current_loss
             nonlocal scores
             nonlocal LR
+            nonlocal ESAT
 
             for k in range(i):
                 print(f'{k} loss: {current_loss.data}')
@@ -191,6 +192,9 @@ class MLP(Module):
 
                 scores = self(X)
                 current_loss = get_loss(scores)
+                if ESAT is not None and current_loss.data < ESAT:
+                    print(f'EARLY STOP BY ESAT={ESAT}!')
+                    break
 
             print(f'final loss: {current_loss.data}')
             return current_loss, scores
