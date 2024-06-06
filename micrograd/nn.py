@@ -87,10 +87,11 @@ class Neuron(Module):
 
     def _sbin(self, x):
         act = self._line(x)
-        if abs(act.data) < Neuron.EPS: # if too close to zero
+        if abs(act.data) < Neuron.EPS: # make it `line` if too close to zero
             return act
 
         act = act / abs(act.data)
+        act.data = np.round(act.data)
         act._name = 'sbin'
         return act
 
