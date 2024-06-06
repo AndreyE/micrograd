@@ -15,10 +15,10 @@ class Neuron(Module):
         self.b = Value(init(), _name=f'L{_lid}:n{_nid}:b', **kwargs) if bias else None
 
         self._train = False
-        self._activate = self._pick_activation(act)
+        self._activate = self._pick_activation(act, debug=False)
         self._lid = _lid
         self._nid = _nid
-        self._std = 0.0
+        self._norm = 0.0
 
     def __call__(self, X):
         outs = []
@@ -28,29 +28,50 @@ class Neuron(Module):
 
         if self._train:
             data = np.array([o.data for o in outs])
-            self._std = data.std()
-            print(f'debug: std = {self._std}')
+            self._minmax = (data.min(), data.max())
+            space = self._minmax[1] - self._minmax[0]
+            print(f'debug: minmax = {self._minmax}, space = {space}')
 
-            if self._std > 1.0:
+            if self._norm > 1.0:
                 for out in outs:
-                    out /= self._std
+                    out /= space
 
         return outs
 
+    def set_train(self, train: bool):
+        if self._activate == self._line:
+            self._train = train
 
-    def _pick_activation(self, act='line'):
+    def _pick_activation(self, act='line', debug=False):
+        act_f = None
         if act == 'line':
-            return self._line
+            act_f = self._line
         elif act == 'sbin':
-            return self._sbin
+            act_f = self._sbin
         elif act == 'bin':
-            return self._bin
+            act_f = self._bin
         elif act == 'minmax':
-            return self._minmax
+            act_f = self._minmax
         elif act == 'snap':
-            return self._snap
+            act_f = self._snap
 
-        assert False, f'Unsupported activation function {act}'
+        assert act_f is not None, f'Unsupported activation function {act}'
+
+        if debug:
+            def debug_act_f(x):
+                act = act_f(x)
+
+                backward = act._backward
+                def _backward():
+                    backward()
+                    print(f'debug: {act._name}:{act._op}:[{act.data}, {act.grad}]')
+                act._backward = _backward
+
+                return act
+
+            return debug_act_f
+
+        return act_f
 
     def _line(self, x):
         assert len(self.w) == len(x), f'w[{len(self.w)}] != x[{len(x)}])'
@@ -140,7 +161,7 @@ class MLP(Module):
     def set_train(self, train: bool):
         self._train = train
         for n in self.neurons():
-            n._train = train
+            n.set_train(train)
 
     def parameters(self):
         return [p for layer in self.layers for p in layer.parameters()]
@@ -148,33 +169,25 @@ class MLP(Module):
     def neurons(self):
         return [n for layer in self.layers for n in layer.neurons]
 
-    def learn_from(self, loss: Value, q: float = 1.0, logging=False, lr=None):
+    def learn_from(self, loss: Value, q: float = 1.0, logging=False, LR=None):
         # propagate grad
         loss.backward(logging=logging)
         # learn
         for p in self.parameters():
-            p.learn(q=q, logging=logging, lr=lr)
-        if self._train:
-            self._imbue()
+            p.learn(q=q, logging=logging, LR=LR)
 
-    def _imbue(self):
-        for n in self.neurons():
-            if n._std <= 1.0:
-                continue
-            for p in n.parameters():
-                p.data /= n._space
-
-    def make_learner(self, X, get_loss):
+    def make_learner(self, X, get_loss, LR=None):
         scores = self(X)
         current_loss = get_loss(scores)
 
         def learner(i=1, q=1.0, logging=False):
             nonlocal current_loss
             nonlocal scores
+            nonlocal LR
 
             for k in range(i):
                 print(f'{k} loss: {current_loss.data}')
-                self.learn_from(current_loss, logging=logging, q=q) # , lr=starting_loss/current_loss.data)
+                self.learn_from(current_loss, logging=logging, q=q, LR=LR)
 
                 scores = self(X)
                 current_loss = get_loss(scores)
