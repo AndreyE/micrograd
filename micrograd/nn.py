@@ -199,7 +199,7 @@ class MLP(Module):
             print(f'final loss: {current_loss.data}')
             return current_loss, scores
 
-        return learner
+        return learner, scores, current_loss
 
     def __repr__(self):
         return f"MLP of [{', '.join(str(layer) for layer in self.layers)}]"

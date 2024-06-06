@@ -165,7 +165,7 @@ class Value:
 
     def __truediv__(self, other): # self / other
         out = self * other**-1
-        out._op = '/'
+        out._op = '*'
         out._name = 'div'
         return out
 
