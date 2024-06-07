@@ -28,7 +28,7 @@ def batch2vals(batch):
     return tuple(map(arr2vals, batch))
 
 
-def oh_encode(classes: torch.tensor):
+def oh_encode(classes: torch.tensor, neg=_NEG, pos=_POS):
     if isinstance(classes, list):
         classes = torch.tensor(classes)
 
@@ -41,8 +41,8 @@ def oh_encode(classes: torch.tensor):
     oh_dec = defaultdict(lambda: None)
 
     for i, cls in enumerate(classes):
-        cls_vec = torch.tensor([_NEG] * classes.shape[0])
-        cls_vec[i] = _POS
+        cls_vec = torch.tensor([neg] * classes.shape[0])
+        cls_vec[i] = pos
         oh_enc[cls.item()] = cls_vec
         oh_dec[tuple(cls_vec.numpy())] = cls.item()
 

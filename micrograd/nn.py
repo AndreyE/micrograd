@@ -29,7 +29,7 @@ class Neuron(Module):
             data = np.array([act.data for act in acts])
             self._minmax = (data.min(), data.max())
             space = self._minmax[1] - self._minmax[0]
-            print(f'debug: minmax = {self._minmax}, space = {space}')
+            # print(f'debug: minmax = {self._minmax}, space = {space}')
 
             if space != 0.0:
                 return [act / space for act in acts]
@@ -176,7 +176,7 @@ class MLP(Module):
         for p in self.parameters():
             p.learn(q=q, logging=logging, LR=LR)
 
-    def make_learner(self, X, get_loss, ESAT=None, LR=None):
+    def make_learner(self, X, get_loss, ESAT=0.0, LR=None):
         scores = self(X)
         current_loss = get_loss(scores)
 
@@ -192,7 +192,7 @@ class MLP(Module):
 
                 scores = self(X)
                 current_loss = get_loss(scores)
-                if ESAT is not None and current_loss.data < ESAT:
+                if current_loss.data <= ESAT:
                     print(f'EARLY STOP BY ESAT={ESAT}!')
                     break
 
