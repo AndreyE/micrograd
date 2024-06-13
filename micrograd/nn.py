@@ -9,15 +9,18 @@ class Module:
 class Neuron(Module):
     EPS = 1e-3
 
-    def __init__(self, nin, act, bias=False, init=lambda: 0.0, _lid='', _nid='', **kwargs):
-        self.id = f'L{_lid}:n{_nid}->{act}({nin})'
-        self.w = [Value(init(), _name=f'L{_lid}:n{_nid}:w{w}', **kwargs) for w in range(nin)]
-        self.b = Value(init(), _name=f'L{_lid}:n{_nid}:b', **kwargs) if bias else None
-
+    def __init__(self, act, bias=False, init=lambda: 0.0, _lid='', _nid='', **kwargs):
+        self.act = act
+        self._nin = 0
         self._train = False
+        self._init = init
         self._activate = self._pick_activation(act, debug=False)
         self._lid = _lid
         self._nid = _nid
+        self._kwargs = kwargs
+
+        self.w = []
+        self.b = Value(init(), _name=f'L{_lid}:n{_nid}:b', **kwargs) if bias else None
 
     def __call__(self, X):
         acts = []
@@ -35,6 +38,16 @@ class Neuron(Module):
                 return [act / space for act in acts]
 
         return acts
+
+    def _accomodate(self, X):
+        self.w.extend([
+            Value(
+                    self._init(),
+                    _name=f'L{self._lid}:n{self._nid}:w{w}',
+                    **self._kwargs
+                )
+                for w in range(len(self.w), len(X))
+        ])
 
     def set_train(self, train: bool):
         if self._activate == self._line:
@@ -69,7 +82,11 @@ class Neuron(Module):
 
             return debug_act_f
 
-        return act_f
+        def prod_act_f(X):
+            self._accomodate(X)
+            return act_f(X)
+
+        return prod_act_f
 
     def _line(self, x):
         assert len(self.w) == len(x), f'w[{len(self.w)}] != x[{len(x)}])'
@@ -122,18 +139,24 @@ class Neuron(Module):
         else:
             return self.w + [self.b]
 
+    def freeze(self):
+        for p in self.parameters():
+            p.freeze()
+
     def learn(self, q: float = 1.0, logging=False, LR=None):
         return any([p.learn(q=q, logging=logging, LR=LR) for p in self.parameters()])
 
     def __repr__(self):
-        return self.id
+        return f'L{self._lid}:n{self._nid}->{self.act}({self._nin})'
 
 class Layer(Module):
 
-    def __init__(self, shape, act, _lid=None, **kwargs):
-        nin, nout = shape
-        self.neurons = [Neuron(nin, act, _nid=n, _lid=_lid, **kwargs) for n in range(nout)]
+    def __init__(self, act, _nout=1, _lid=None, LR=1.0, **kwargs):
+        self.neurons = [Neuron(act, _nid=n, _lid=_lid, LR=LR, **kwargs) for n in range(_nout)]
+        self._lr = LR
         self._lid = _lid
+        self._act = act
+        self._kwargs = kwargs
 
     def __call__(self, X):
         outs = [n(X) for n in self.neurons]
@@ -145,6 +168,15 @@ class Layer(Module):
 
     def learn(self, q: float = 1.0, logging=False, LR=None):
         return any([n.learn(q=q, logging=logging, LR=LR) for n in self.neurons])
+
+    def freeze(self):
+        for n in self.neurons:
+            n.freeze()
+
+    def expand(self):
+        self.neurons.append(
+            Neuron(self._act, _nid=len(self.neurons), _lid=self._lid, **self._kwargs)
+        )
 
     def __repr__(self):
         return f"Layer L{self._lid} of [{', '.join(str(n) for n in self.neurons)}]"
@@ -172,10 +204,16 @@ class MLP(Module):
         return [n for layer in self.layers for n in layer.neurons]
 
     def learn_from(self, loss: Value, q: float = 1.0, logging=False, LR=None):
+        learnt_smth = False
         # propagate grad
         loss.backward(logging=logging)
         # learn
-        return any([l.learn(q=q, logging=logging, LR=LR) for l in self.layers])
+        for l in self.layers[:-1]:
+            if l.learn(q=q, logging=logging, LR=LR):
+                l.freeze()
+                l.expand()
+                learnt_smth = True
+        return self.layers[-1].learn(q=q, logging=logging, LR=LR) or learnt_smth
 
     def make_learner(self, X, get_loss, ESAT=0.0, LR=None):
         scores = self(X)

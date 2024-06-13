@@ -5,15 +5,16 @@ import logging
 class Value:
     """ stores a single scalar value and its gradient """
 
-    def __init__(self, data, _children=[], _lr=1.0, _op='', _name='auto'):
+    def __init__(self, data, _children=[], LR=1.0, _op='', _name='auto', _frozen=False):
         self.data = np.float64(data)
         self.grad = 0.0
-        # internal variables used for autograd graph construction
+
+        self._frozen = _frozen
         self._backward = lambda: None
         self._prev = _children
-        self._op = _op # the op that produced this node, for graphviz / debugging / etc
+        self._op = _op
         self._name = _name
-        self._lr = _lr
+        self._lr = LR
         self._pgrad = 0.0
 
     def __add__(self, other):
@@ -51,6 +52,9 @@ class Value:
         out._backward = _backward
 
         return out
+
+    def freeze(self):
+        self._frozen = True
 
     def child(self, idx):
         return self._prev[idx]
@@ -141,6 +145,9 @@ class Value:
 
     def learn(self, q=1.0, logging=False, LR=None):
         assert q <= 1
+
+        if self._frozen:
+            return False
 
         # if previous gradient has different sign then reduce the step size by q
         lr = LR
