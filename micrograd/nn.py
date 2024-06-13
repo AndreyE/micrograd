@@ -89,11 +89,7 @@ class Neuron(Module):
         act = self._line(x)
         if abs(act.data) < Neuron.EPS: # make it `line` if too close to zero
             return act
-
-        act = act / abs(act.data)
-        act.data = np.round(act.data)
-        act._name = 'sbin'
-        return act
+        return act.sbin()
 
     def _bin(self, x):
         act = (self._sbin(x) + 1) / 2
@@ -126,6 +122,9 @@ class Neuron(Module):
         else:
             return self.w + [self.b]
 
+    def learn(self, q: float = 1.0, logging=False, LR=None):
+        return any([p.learn(q=q, logging=logging, LR=LR) for p in self.parameters()])
+
     def __repr__(self):
         return self.id
 
@@ -143,6 +142,9 @@ class Layer(Module):
 
     def parameters(self):
         return [p for n in self.neurons for p in n.parameters()]
+
+    def learn(self, q: float = 1.0, logging=False, LR=None):
+        return any([n.learn(q=q, logging=logging, LR=LR) for n in self.neurons])
 
     def __repr__(self):
         return f"Layer L{self._lid} of [{', '.join(str(n) for n in self.neurons)}]"
@@ -173,8 +175,7 @@ class MLP(Module):
         # propagate grad
         loss.backward(logging=logging)
         # learn
-        for p in self.parameters():
-            p.learn(q=q, logging=logging, LR=LR)
+        return any([l.learn(q=q, logging=logging, LR=LR) for l in self.layers])
 
     def make_learner(self, X, get_loss, ESAT=0.0, LR=None):
         scores = self(X)
@@ -188,12 +189,16 @@ class MLP(Module):
 
             for k in range(i):
                 print(f'{k} loss: {current_loss.data}')
-                self.learn_from(current_loss, logging=logging, q=q, LR=LR)
+                learning_progress = self.learn_from(current_loss, logging=logging, q=q, LR=LR)
 
                 scores = self(X)
                 current_loss = get_loss(scores)
                 if current_loss.data <= ESAT:
                     print(f'EARLY STOP BY ESAT={ESAT}!')
+                    break
+
+                if not learning_progress:
+                    print(f'SUDDEN STOP BECAUSE OF NO LEARNING PROGRESS!')
                     break
 
             print(f'final loss: {current_loss.data}')

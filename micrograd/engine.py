@@ -101,10 +101,19 @@ class Value:
         return out
 
     def abs(self):
-        return (self**2)**0.5
+        if self.data >= 0:
+            return self
+        return self * -1.0
+
+    def sbin(self):
+        if abs(self.data) == 0.0:
+            return self
+        out = self / abs(self.data)
+        out.data = np.round(out.data)
+        out._name = 'sbin'
+        return out
 
     def backward(self, logging=False):
-
         # topological order all of the children in the graph
         topo = []
         visited = set()
@@ -142,11 +151,14 @@ class Value:
                 self._lr *= q  ** -(1/2)
             lr = self._lr
 
-        data = self.data - lr * self.grad
+        change = lr * self.grad
+        data = self.data - change
 
         if logging:
             print(f'learn:{self._name}[data[{data} <- {self.data}+{-(lr * self.grad)}]')
         self.data = data
+
+        return change != 0.0
 
     def __neg__(self): # -self
         out = self * Value(-1, _name='-1')
