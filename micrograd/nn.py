@@ -157,6 +157,7 @@ class Layer(Module):
         self._lid = _lid
         self._act = act
         self._kwargs = kwargs
+        self.expandable=True
 
     def __call__(self, X):
         outs = [n(X) for n in self.neurons]
@@ -174,9 +175,10 @@ class Layer(Module):
             n.freeze()
 
     def expand(self):
-        self.neurons.append(
-            Neuron(self._act, _nid=len(self.neurons), _lid=self._lid, **self._kwargs)
-        )
+        if self.expandable:
+            self.neurons.append(
+                Neuron(self._act, _nid=len(self.neurons), _lid=self._lid, **self._kwargs)
+            )
 
     def __repr__(self):
         return f"Layer L{self._lid} of [{', '.join(str(n) for n in self.neurons)}]"
@@ -210,9 +212,9 @@ class MLP(Module):
         # learn
         for l in self.layers[:-1]:
             if l.learn(q=q, logging=logging, LR=LR):
-                l.freeze()
-                l.expand()
+                # l.freeze()
                 learnt_smth = True
+                l.expand()
         return self.layers[-1].learn(q=q, logging=logging, LR=LR) or learnt_smth
 
     def make_learner(self, X, get_loss, ESAT=0.0, LR=None):

@@ -7,7 +7,7 @@ class Value:
 
     def __init__(self, data, _children=[], LR=1.0, _op='', _name='auto', _frozen=False):
         self.data = np.float64(data)
-        self.grad = 0.0
+        self._grad = []
 
         self._frozen = _frozen
         self._backward = lambda: None
@@ -17,13 +17,16 @@ class Value:
         self._lr = LR
         self._pgrad = 0.0
 
+    def grad(self):
+        return sum(self._grad)
+
     def __add__(self, other):
         other = other if isinstance(other, Value) else Value(other,)
         out = Value(self.data + other.data, (self, other), _op='+')
 
         def _backward():
-            self.grad += out.grad
-            other.grad += out.grad
+            self._grad += [1 * out.grad()]
+            other._grad += [1 * out.grad()]
         out._backward = _backward
 
         return out
@@ -36,8 +39,8 @@ class Value:
         out = Value(self.data * other.data, (self, other), _op='*')
 
         def _backward():
-            self.grad += other.data * out.grad
-            other.grad += self.data * out.grad
+            self._grad += [other.data * out.grad()]
+            other._grad += [self.data * out.grad()]
         out._backward = _backward
 
         return out
@@ -48,7 +51,7 @@ class Value:
 
         def _backward():
             if self.data != 0.0:
-                self.grad += (other * self.data**(other-1)) * out.grad
+                self._grad += [(other * self.data**(other-1)) * out.grad()]
         out._backward = _backward
 
         return out
@@ -69,7 +72,7 @@ class Value:
         out = Value(y, (self,), _op='ReLU')
 
         def _backward():
-            self.grad += (y > 0) * out.grad
+            self._grad += [(y > 0) * out.grad()]
         out._backward = _backward
 
         return out
@@ -79,7 +82,7 @@ class Value:
         out = Value(y, (self,), _op='tanh')
 
         def _backward():
-            self.grad += (1 - y**2) * out.grad
+            self._grad += [(1 - y**2) * out.grad()]
         out._backward = _backward
 
         return out
@@ -89,7 +92,7 @@ class Value:
         out = Value(y, (self, ), _op='exp')
 
         def _backward():
-            self.grad = y * out.grad
+            self._grad = y * out.grad()
         out._backward = _backward
 
         return out
@@ -99,7 +102,7 @@ class Value:
         out = Value(y, (self, ), _op='Sigmoid')
 
         def _backward():
-            self.grad += y * (1 - y) * out.grad
+            self._grad += [y * (1 - y) * out.grad()]
         out._backward = _backward
 
         return out
@@ -133,15 +136,15 @@ class Value:
             v.zero_grad()
 
         # go one variable at a time and apply the chain rule to get its gradient
-        self.grad = 1
+        self._grad = [1]
         for v in reversed(topo):
             v._backward()
             if logging:
                 print(f'backward:{v._name}:[grad <- {v.grad}]')
 
     def zero_grad(self):
-        self._pgrad = self.grad
-        self.grad = 0.0
+        self._pgrad = self.grad()
+        self._grad = []
 
     def learn(self, q=1.0, logging=False, LR=None):
         assert q <= 1
@@ -150,19 +153,20 @@ class Value:
             return False
 
         # if previous gradient has different sign then reduce the step size by q
+        grad = self.grad()
         lr = LR
         if lr is None:
-            if self._pgrad * self.grad < 0:
+            if self._pgrad * grad < 0:
                 self._lr *= q
             else:
                 self._lr *= q  ** -(1/2)
             lr = self._lr
 
-        change = lr * self.grad
+        change = lr * grad
         data = self.data - change
 
         if logging:
-            print(f'learn:{self._name}[data[{data} <- {self.data}+{-(lr * self.grad)}]')
+            print(f'learn:{self._name}[data[{data} <- {self.data}+{-(lr * grad)}]')
         self.data = data
 
         return change != 0.0
@@ -192,4 +196,4 @@ class Value:
         return other * self**-1
 
     def __repr__(self):
-        return f"Value({self._name} : [{self.data}, {self.grad}, {self._lr}])"
+        return f"Value({self._name} : [{self.data}, {self._grad}, {self._lr}])"
